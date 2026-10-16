@@ -1,5 +1,20 @@
+mod clip_control {
+    use wasm_bindgen::prelude::*;
+
+    #[wasm_bindgen]
+    extern "C" {
+        #[derive(Debug, Clone, PartialEq, Eq)]
+        #[wasm_bindgen(extends = js_sys::Object)]
+        pub type ExtClipControl;
+
+        #[wasm_bindgen(method, js_name = clipControlEXT)]
+        pub fn clip_control_ext(this: &ExtClipControl, origin: u32, depth: u32);
+    }
+}
+
 use super::*;
 
+pub use clip_control::ExtClipControl;
 use js_sys::{self, Array};
 use slotmap::{new_key_type, SlotMap};
 use std::cell::RefCell;
@@ -21,6 +36,7 @@ enum RawRenderingContext {
 struct Extensions {
     pub angle_instanced_arrays: Option<web_sys::AngleInstancedArrays>,
     pub ext_blend_minmax: Option<web_sys::ExtBlendMinmax>,
+    pub ext_clip_control: Option<ExtClipControl>,
     pub ext_color_buffer_float: Option<web_sys::ExtColorBufferFloat>,
     pub ext_color_buffer_half_float: Option<web_sys::ExtColorBufferHalfFloat>,
     pub ext_disjoint_timer_query: Option<web_sys::ExtDisjointTimerQuery>,
@@ -53,6 +69,7 @@ struct Extensions {
     pub webgl_debug_shaders: Option<web_sys::WebglDebugShaders>,
     pub webgl_depth_texture: Option<web_sys::WebglDepthTexture>,
     pub webgl_draw_buffers: Option<web_sys::WebglDrawBuffers>,
+    pub webgl_multi_draw: Option<web_sys::WebglMultiDraw>,
     pub webgl_lose_context: Option<web_sys::WebglLoseContext>,
 }
 
@@ -114,6 +131,7 @@ macro_rules! build_extensions {
                 &$context,
                 "EXT_blend_minmax",
             ),
+            ext_clip_control: get_extension::<ExtClipControl>(&$context, "EXT_clip_control"),
             ext_color_buffer_float: get_extension::<web_sys::ExtColorBufferFloat>(
                 &$context,
                 "EXT_color_buffer_float",
@@ -227,6 +245,10 @@ macro_rules! build_extensions {
             webgl_draw_buffers: get_extension::<web_sys::WebglDrawBuffers>(
                 &$context,
                 "WEBGL_draw_buffers",
+            ),
+            webgl_multi_draw: get_extension::<web_sys::WebglMultiDraw>(
+                &$context,
+                "WEBGL_multi_draw",
             ),
             webgl_lose_context: get_extension::<web_sys::WebglLoseContext>(
                 &$context,
@@ -3471,6 +3493,83 @@ impl HasContext for Context {
         _layer: i32,
     ) {
         panic!("Named framebuffers are not supported");
+    }
+
+    unsafe fn clip_control(&self, origin: u32, depth: u32) {
+        if let Some(ext) = &self.extensions.ext_clip_control {
+            ext.clip_control_ext(origin, depth);
+        } else {
+            panic!("EXT_clip_control is not available")
+        }
+    }
+
+    unsafe fn multi_draw_arrays(&self, mode: u32, first: &[i32], count: &[i32]) {
+        if let Some(ext) = &self.extensions.webgl_multi_draw {
+            let first_js = js_sys::Int32Array::view(first);
+            let count_js = js_sys::Int32Array::view(count);
+
+            ext.multi_draw_arrays_webgl_with_js_i32_array_and_js_i32_array(
+                mode,
+                &first_js,
+                0,
+                &count_js,
+                0,
+                count.len() as i32,
+            );
+        } else {
+            panic!("WEBGL_multi_draw extension not available");
+        }
+    }
+
+    unsafe fn multi_draw_arrays_indirect(
+        &self,
+        mode: u32,
+        indirect: i32,
+        draw_count: i32,
+        stride: i32,
+    ) {
+        todo!()
+    }
+
+    unsafe fn multi_draw_elements(&self, mode: u32, count: &[i32], ty: u32, offsets: &[i32]) {
+        if let Some(ext) = &self.extensions.webgl_multi_draw {
+            let count_js = js_sys::Int32Array::view(count);
+            let offsets_js = js_sys::Int32Array::view(offsets);
+
+            ext.multi_draw_elements_webgl_with_js_i32_array_and_js_i32_array(
+                mode,
+                &count_js,
+                0,
+                ty,
+                &offsets_js,
+                0,
+                count.len() as i32,
+            );
+        } else {
+            panic!("WEBGL_multi_draw extension not available");
+        }
+    }
+
+    unsafe fn multi_draw_elements_base_vertex(
+        &self,
+        mode: u32,
+        count: &[i32],
+        ty: u32,
+        offsets: &[i32],
+        base_vertex: &[i32],
+    ) {
+        todo!()
+    }
+
+    unsafe fn multi_draw_elements_indirect(
+        &self,
+        mode: u32,
+        ty: u32,
+        indirect: i32,
+        draw_count: i32,
+        stride: i32,
+    ) {
+        todo!()
     }
 
     unsafe fn front_face(&self, value: u32) {

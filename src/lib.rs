@@ -963,6 +963,38 @@ pub trait HasContext: __private::Sealed {
         layer: i32,
     );
 
+    unsafe fn clip_control(&self, origin: u32, depth: u32);
+
+    unsafe fn multi_draw_arrays(&self, mode: u32, first: &[i32], count: &[i32]);
+
+    unsafe fn multi_draw_arrays_indirect(
+        &self,
+        mode: u32,
+        indirect: i32,
+        draw_count: i32,
+        stride: i32,
+    );
+
+    unsafe fn multi_draw_elements(&self, mode: u32, count: &[i32], ty: u32, offsets: &[i32]);
+
+    unsafe fn multi_draw_elements_base_vertex(
+        &self,
+        mode: u32,
+        count: &[i32],
+        ty: u32,
+        offsets: &[i32],
+        base_vertex: &[i32],
+    );
+
+    unsafe fn multi_draw_elements_indirect(
+        &self,
+        mode: u32,
+        ty: u32,
+        indirect: i32,
+        draw_count: i32,
+        stride: i32,
+    );
+
     unsafe fn front_face(&self, value: u32);
 
     unsafe fn get_error(&self) -> u32;

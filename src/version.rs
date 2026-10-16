@@ -13,10 +13,10 @@ impl Version {
     #[allow(dead_code)]
     pub(crate) fn new(major: u32, minor: u32, revision: Option<u32>, vendor_info: String) -> Self {
         Version {
-            major: major,
-            minor: minor,
+            major,
+            minor,
             is_embedded: false,
-            revision: revision,
+            revision,
             vendor_info,
         }
     }

@@ -503,12 +503,12 @@ impl HasContext for Context {
         gl.GetProgramiv(program.0.get(), INFO_LOG_LENGTH, &mut length);
         if length > 0 {
             let mut log = String::with_capacity(length as usize);
-            log.extend(std::iter::repeat('\0').take(length as usize));
+            log.extend(std::iter::repeat_n('\0', length as usize));
             gl.GetProgramInfoLog(
                 program.0.get(),
                 length,
                 &mut length,
-                (&log[..]).as_ptr() as *mut native_gl::GLchar,
+                log[..].as_ptr() as *mut native_gl::GLchar,
             );
             log.truncate(length as usize);
             log
@@ -1158,7 +1158,7 @@ impl HasContext for Context {
         );
 
         let mut name = String::with_capacity(uniform_max_size as usize);
-        name.extend(std::iter::repeat('\0').take(uniform_max_size as usize));
+        name.extend(std::iter::repeat_n('\0', uniform_max_size as usize));
         let mut length = 0;
         let mut size = 0;
         let mut utype = 0;
@@ -2164,6 +2164,90 @@ impl HasContext for Context {
         );
     }
 
+    unsafe fn clip_control(&self, origin: u32, depth: u32) {
+        let gl = &self.raw;
+        gl.ClipControl(origin as u32, depth as u32);
+    }
+
+    unsafe fn multi_draw_arrays(&self, mode: u32, first: &[i32], count: &[i32]) {
+        let gl = &self.raw;
+        gl.MultiDrawArrays(
+            mode as u32,
+            first.as_ptr(),
+            count.as_ptr(),
+            count.len() as i32,
+        );
+    }
+
+    unsafe fn multi_draw_arrays_indirect(
+        &self,
+        mode: u32,
+        indirect: i32,
+        draw_count: i32,
+        stride: i32,
+    ) {
+        let gl = &self.raw;
+        gl.MultiDrawArraysIndirect(
+            mode,
+            indirect as *const std::ffi::c_void,
+            draw_count,
+            stride,
+        );
+    }
+
+    unsafe fn multi_draw_elements(&self, mode: u32, count: &[i32], ty: u32, offsets: &[i32]) {
+        assert_eq!(count.len(), offsets.len());
+        let gl = &self.raw;
+        let ptrs: Vec<*const std::ffi::c_void> = offsets
+            .iter()
+            .map(|&o| o as isize as *const std::ffi::c_void)
+            .collect();
+        gl.MultiDrawElements(mode, count.as_ptr(), ty, ptrs.as_ptr(), count.len() as i32);
+    }
+
+    unsafe fn multi_draw_elements_base_vertex(
+        &self,
+        mode: u32,
+        count: &[i32],
+        ty: u32,
+        offsets: &[i32],
+        base_vertex: &[i32],
+    ) {
+        assert_eq!(count.len(), offsets.len());
+        assert_eq!(count.len(), base_vertex.len());
+        let gl = &self.raw;
+        let ptrs: Vec<*const std::ffi::c_void> = offsets
+            .iter()
+            .map(|&o| o as isize as *const std::ffi::c_void)
+            .collect();
+        gl.MultiDrawElementsBaseVertex(
+            mode,
+            count.as_ptr(),
+            ty,
+            ptrs.as_ptr(),
+            count.len() as i32,
+            base_vertex.as_ptr(),
+        );
+    }
+
+    unsafe fn multi_draw_elements_indirect(
+        &self,
+        mode: u32,
+        ty: u32,
+        indirect: i32,
+        draw_count: i32,
+        stride: i32,
+    ) {
+        let gl = &self.raw;
+        gl.MultiDrawElementsIndirect(
+            mode,
+            ty,
+            indirect as *const std::ffi::c_void,
+            draw_count,
+            stride,
+        );
+    }
+
     unsafe fn front_face(&self, value: u32) {
         let gl = &self.raw;
         gl.FrontFace(value as u32);
@@ -2474,7 +2558,7 @@ impl HasContext for Context {
             &mut attribute_max_size,
         );
         let mut name = String::with_capacity(attribute_max_size as usize);
-        name.extend(std::iter::repeat('\0').take(attribute_max_size as usize));
+        name.extend(std::iter::repeat_n('\0', attribute_max_size as usize));
         let mut length = 0;
         let mut size = 0;
         let mut atype = 0;
@@ -4623,7 +4707,7 @@ impl HasContext for Context {
                 (length as usize + 1).min(buffer.len()),
             );
 
-            let name = CStr::from_bytes_with_nul(&buffer[..])
+            let name = CStr::from_bytes_with_nul(buffer)
                 .unwrap()
                 .to_str()
                 .unwrap()
@@ -4674,19 +4758,16 @@ impl HasContext for Context {
 
 impl Drop for Context {
     fn drop(&mut self) {
-        match self.debug_callback.take() {
-            Some(_) => {
-                // Unset the debug callback before destroying the context.
-                unsafe {
-                    let gl = &self.raw;
-                    if gl.DebugMessageCallback_is_loaded() {
-                        gl.DebugMessageCallback(None, std::ptr::null());
-                    } else {
-                        gl.DebugMessageCallbackKHR(None, std::ptr::null());
-                    }
+        if self.debug_callback.take().is_some() {
+            // Unset the debug callback before destroying the context.
+            unsafe {
+                let gl = &self.raw;
+                if gl.DebugMessageCallback_is_loaded() {
+                    gl.DebugMessageCallback(None, std::ptr::null());
+                } else {
+                    gl.DebugMessageCallbackKHR(None, std::ptr::null());
                 }
             }
-            None => {}
         }
     }
 }
